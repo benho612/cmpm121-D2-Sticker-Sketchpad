@@ -5,7 +5,7 @@ const appTitle: HTMLHeadingElement = document.createElement("h1");
 appTitle.textContent = "Quaint Paint";
 document.body.append(appTitle);
 
-// Toolbar (for buttons like Clear)
+// Toolbar
 const toolbar = document.createElement("div");
 toolbar.className = "toolbar";
 document.body.append(toolbar);
@@ -16,58 +16,73 @@ canvas.width = 256;
 canvas.height = 256;
 document.body.append(canvas);
 
-// 1) Get 2D context and initialize a white background
+// Context + white background
 const ctx = canvas.getContext("2d")!;
 ctx.fillStyle = "#fff";
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-// 2) Drawing state
-let drawing = false;
-let lastX = 0;
-let lastY = 0;
+type Point = { x: number; y: number };
+let displayList: Point[][] = [];
+let currentStroke: Point[] | null = null;
 
-// Basic marker look
-ctx.lineCap = "round";
-ctx.lineJoin = "round";
-ctx.lineWidth = 4;
-ctx.strokeStyle = "#111"; // dark gray/black
+const redraw = () => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#111";
+
+  for (const stroke of displayList) {
+    if (stroke.length < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(stroke[0].x, stroke[0].y);
+    for (let i = 1; i < stroke.length; i++) {
+      ctx.lineTo(stroke[i].x, stroke[i].y);
+    }
+    ctx.stroke();
+  }
+};
+
+const dispatchChanged = () => {
+  canvas.dispatchEvent(new Event("drawing-changed"));
+};
+
+canvas.addEventListener("drawing-changed", redraw);
+
+// Mouse helpers + handlers (record, then redraw)
 function getPos(e: MouseEvent) {
   const rect = canvas.getBoundingClientRect();
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
 
-// Start stroke
 canvas.addEventListener("mousedown", (e) => {
-  drawing = true;
-  const { x, y } = getPos(e);
-  lastX = x;
-  lastY = y;
+  currentStroke = [];
+  displayList.push(currentStroke);
+  currentStroke.push(getPos(e));
+  dispatchChanged();
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (!drawing) return;
-  const { x, y } = getPos(e);
-  ctx.beginPath();
-  ctx.moveTo(lastX, lastY);
-  ctx.lineTo(x, y);
-  ctx.stroke();
-  lastX = x;
-  lastY = y;
+  if (!currentStroke) return;
+  currentStroke.push(getPos(e));
+  dispatchChanged();
 });
 
-// End stroke on mouseup/leave
 ["mouseup", "mouseleave"].forEach((ev) =>
-  canvas.addEventListener(ev, () => (drawing = false))
+  canvas.addEventListener(ev, () => {
+    currentStroke = null;
+  })
 );
 
-// 3) Clear button
+// Clear button
 const clearBtn = document.createElement("button");
 clearBtn.textContent = "Clear";
 toolbar.append(clearBtn);
 
 clearBtn.addEventListener("click", () => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  displayList = [];
+  dispatchChanged();
 });
