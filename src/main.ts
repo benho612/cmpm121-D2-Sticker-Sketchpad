@@ -25,6 +25,7 @@ type Point = { x: number; y: number };
 let displayList: Point[][] = [];
 let currentStroke: Point[] | null = null;
 
+// Redraw from the model
 const redraw = () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#fff";
@@ -46,7 +47,25 @@ const redraw = () => {
   }
 };
 
+// Buttons
+const clearBtn = document.createElement("button");
+clearBtn.textContent = "Clear";
+toolbar.append(clearBtn);
+const undoBtn = document.createElement("button");
+undoBtn.textContent = "Undo";
+const redoBtn = document.createElement("button");
+redoBtn.textContent = "Redo";
+toolbar.append(undoBtn, redoBtn);
+
+let redoStack: Point[][] = [];
+
+function updateHistoryButtons() {
+  undoBtn.disabled = displayList.length === 0;
+  redoBtn.disabled = redoStack.length === 0;
+}
+
 const dispatchChanged = () => {
+  updateHistoryButtons();
   canvas.dispatchEvent(new Event("drawing-changed"));
 };
 
@@ -59,6 +78,8 @@ function getPos(e: MouseEvent) {
 }
 
 canvas.addEventListener("mousedown", (e) => {
+  redoStack = [];
+
   currentStroke = [];
   displayList.push(currentStroke);
   currentStroke.push(getPos(e));
@@ -77,12 +98,26 @@ canvas.addEventListener("mousemove", (e) => {
   })
 );
 
-// Clear button
-const clearBtn = document.createElement("button");
-clearBtn.textContent = "Clear";
-toolbar.append(clearBtn);
-
+// Clear wipes both stacks
 clearBtn.addEventListener("click", () => {
   displayList = [];
+  redoStack = [];
   dispatchChanged();
 });
+
+// Undo/Redo logic
+undoBtn.onclick = () => {
+  if (displayList.length === 0) return;
+  const popped = displayList.pop()!;
+  redoStack.push(popped);
+  dispatchChanged();
+};
+
+redoBtn.onclick = () => {
+  if (redoStack.length === 0) return;
+  const popped = redoStack.pop()!;
+  displayList.push(popped);
+  dispatchChanged();
+};
+
+updateHistoryButtons();
