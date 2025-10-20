@@ -2,6 +2,7 @@ import "./style.css";
 
 //Stroke
 let currentWidth = 4;
+let mouseDown = false;
 const currentColor = "#111";
 
 // Title
@@ -63,6 +64,24 @@ class MarkerStroke implements DisplayCommand {
   }
 }
 
+class MarkerPreview {
+  x = 0;
+  y = 0;
+  set(p: { x: number; y: number }) {
+    this.x = p.x;
+    this.y = p.y;
+  }
+  display(ctx: CanvasRenderingContext2D, radius: number) {
+    // only show when mouse is NOT down
+    if (mouseDown) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, radius / 2, 0, Math.PI * 2);
+    ctx.strokeStyle = "#555";
+    ctx.stroke();
+    ctx.restore();
+  }
+}
 // Drawing state
 let commands: DisplayCommand[] = [];
 let redoCommands: DisplayCommand[] = [];
@@ -93,6 +112,8 @@ function redraw() {
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   for (const cmd of commands) cmd.display(ctx);
+
+  preview.display(ctx, currentWidth);
 }
 
 function dispatchChanged() {
@@ -101,13 +122,20 @@ function dispatchChanged() {
   redoBtn.disabled = redoCommands.length === 0;
 }
 
+function dispatchToolMoved() {
+  canvas.dispatchEvent(new Event("tool-moved"));
+}
+
 function selectTool(btn: HTMLButtonElement) {
   [thinBtn, thickBtn].forEach((b) => b.classList.remove("selected"));
   btn.classList.add("selected");
 }
 
 // Mouse handlers
+const preview = new MarkerPreview();
+
 canvas.addEventListener("mousedown", (e) => {
+  mouseDown = true;
   const start = getPos(e);
   activeStroke = new MarkerStroke(start, currentWidth, currentColor);
   commands.push(activeStroke);
@@ -116,16 +144,25 @@ canvas.addEventListener("mousedown", (e) => {
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (!activeStroke) return;
-  activeStroke.drag(getPos(e));
-  dispatchChanged();
+  const p = getPos(e);
+  preview.set(p);
+  dispatchToolMoved();
+
+  if (activeStroke) {
+    activeStroke.drag(p);
+    dispatchChanged();
+  }
 });
 
 ["mouseup", "mouseleave"].forEach((ev) =>
   canvas.addEventListener(ev, () => {
+    mouseDown = false;
     activeStroke = null;
+    dispatchToolMoved();
   })
 );
+
+canvas.addEventListener("tool-moved", redraw);
 
 // Buttons
 clearBtn.onclick = () => {
@@ -149,11 +186,13 @@ redoBtn.onclick = () => {
 thinBtn.onclick = () => {
   currentWidth = 4;
   selectTool(thinBtn);
+  dispatchToolMoved();
 };
 
 thickBtn.onclick = () => {
   currentWidth = 10;
   selectTool(thickBtn);
+  dispatchToolMoved();
 };
 
 // Initial draw
