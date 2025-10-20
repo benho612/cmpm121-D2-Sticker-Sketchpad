@@ -1,9 +1,9 @@
 import "./style.css";
 
 // Title
-const appTitle: HTMLHeadingElement = document.createElement("h1");
-appTitle.textContent = "Quaint Paint";
-document.body.append(appTitle);
+const title = document.createElement("h1");
+title.textContent = "Quaint Paint";
+document.body.append(title);
 
 // Toolbar
 const toolbar = document.createElement("div");
@@ -11,113 +11,127 @@ toolbar.className = "toolbar";
 document.body.append(toolbar);
 
 // Canvas
-const canvas: HTMLCanvasElement = document.createElement("canvas");
+const canvas = document.createElement("canvas");
 canvas.width = 256;
 canvas.height = 256;
 document.body.append(canvas);
 
-// Context + white background
+// Context setup
 const ctx = canvas.getContext("2d")!;
 ctx.fillStyle = "#fff";
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-type Point = { x: number; y: number };
-let displayList: Point[][] = [];
-let currentStroke: Point[] | null = null;
+// A shared interface for anything drawable
+interface DisplayCommand {
+  display(ctx: CanvasRenderingContext2D): void;
+}
 
-// Redraw from the model
-const redraw = () => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+// A command that represents one marker stroke
+class MarkerStroke implements DisplayCommand {
+  private points: { x: number; y: number }[] = [];
+  private width: number;
+  private color: string;
 
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "#111";
+  constructor(start: { x: number; y: number }, width = 4, color = "#111") {
+    this.points.push(start);
+    this.width = width;
+    this.color = color;
+  }
 
-  for (const stroke of displayList) {
-    if (stroke.length < 2) continue;
+  drag(p: { x: number; y: number }) {
+    this.points.push(p);
+  }
+
+  display(ctx: CanvasRenderingContext2D) {
+    if (this.points.length < 2) return;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = this.width;
+    ctx.strokeStyle = this.color;
     ctx.beginPath();
-    ctx.moveTo(stroke[0].x, stroke[0].y);
-    for (let i = 1; i < stroke.length; i++) {
-      ctx.lineTo(stroke[i].x, stroke[i].y);
+    ctx.moveTo(this.points[0].x, this.points[0].y);
+    for (let i = 1; i < this.points.length; i++) {
+      ctx.lineTo(this.points[i].x, this.points[i].y);
     }
     ctx.stroke();
+    ctx.restore();
   }
-};
+}
+
+// Drawing state
+let commands: DisplayCommand[] = [];
+let redoCommands: DisplayCommand[] = [];
+let activeStroke: MarkerStroke | null = null;
 
 // Buttons
 const clearBtn = document.createElement("button");
 clearBtn.textContent = "Clear";
-toolbar.append(clearBtn);
 const undoBtn = document.createElement("button");
 undoBtn.textContent = "Undo";
 const redoBtn = document.createElement("button");
 redoBtn.textContent = "Redo";
-toolbar.append(undoBtn, redoBtn);
+toolbar.append(clearBtn, undoBtn, redoBtn);
 
-let redoStack: Point[][] = [];
-
-function updateHistoryButtons() {
-  undoBtn.disabled = displayList.length === 0;
-  redoBtn.disabled = redoStack.length === 0;
-}
-
-const dispatchChanged = () => {
-  updateHistoryButtons();
-  canvas.dispatchEvent(new Event("drawing-changed"));
-};
-
-canvas.addEventListener("drawing-changed", redraw);
-
-// Mouse helpers + handlers (record, then redraw)
+// Utilities
 function getPos(e: MouseEvent) {
   const rect = canvas.getBoundingClientRect();
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
 
-canvas.addEventListener("mousedown", (e) => {
-  redoStack = [];
+// Redraw everything
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  for (const cmd of commands) cmd.display(ctx);
+}
 
-  currentStroke = [];
-  displayList.push(currentStroke);
-  currentStroke.push(getPos(e));
+function dispatchChanged() {
+  redraw();
+  undoBtn.disabled = commands.length === 0;
+  redoBtn.disabled = redoCommands.length === 0;
+}
+
+// Mouse handlers
+canvas.addEventListener("mousedown", (e) => {
+  const start = getPos(e);
+  activeStroke = new MarkerStroke(start);
+  commands.push(activeStroke);
+  redoCommands = [];
   dispatchChanged();
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (!currentStroke) return;
-  currentStroke.push(getPos(e));
+  if (!activeStroke) return;
+  activeStroke.drag(getPos(e));
   dispatchChanged();
 });
 
 ["mouseup", "mouseleave"].forEach((ev) =>
   canvas.addEventListener(ev, () => {
-    currentStroke = null;
+    activeStroke = null;
   })
 );
 
-// Clear wipes both stacks
-clearBtn.addEventListener("click", () => {
-  displayList = [];
-  redoStack = [];
+// Buttons
+clearBtn.onclick = () => {
+  commands = [];
+  redoCommands = [];
   dispatchChanged();
-});
+};
 
-// Undo/Redo logic
 undoBtn.onclick = () => {
-  if (displayList.length === 0) return;
-  const popped = displayList.pop()!;
-  redoStack.push(popped);
+  if (commands.length === 0) return;
+  redoCommands.push(commands.pop()!);
   dispatchChanged();
 };
 
 redoBtn.onclick = () => {
-  if (redoStack.length === 0) return;
-  const popped = redoStack.pop()!;
-  displayList.push(popped);
+  if (redoCommands.length === 0) return;
+  commands.push(redoCommands.pop()!);
   dispatchChanged();
 };
 
-updateHistoryButtons();
+// Initial draw
+dispatchChanged();
