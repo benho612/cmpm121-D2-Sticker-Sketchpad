@@ -1,5 +1,9 @@
 import "./style.css";
 
+//Stroke
+let currentWidth = 4;
+const currentColor = "#111";
+
 // Title
 const title = document.createElement("h1");
 title.textContent = "Quaint Paint";
@@ -71,7 +75,11 @@ const undoBtn = document.createElement("button");
 undoBtn.textContent = "Undo";
 const redoBtn = document.createElement("button");
 redoBtn.textContent = "Redo";
-toolbar.append(clearBtn, undoBtn, redoBtn);
+const thinBtn = document.createElement("button");
+thinBtn.textContent = "Thin";
+const thickBtn = document.createElement("button");
+thickBtn.textContent = "Thick";
+toolbar.append(clearBtn, undoBtn, redoBtn, thinBtn, thickBtn);
 
 // Utilities
 function getPos(e: MouseEvent) {
@@ -93,10 +101,15 @@ function dispatchChanged() {
   redoBtn.disabled = redoCommands.length === 0;
 }
 
+function selectTool(btn: HTMLButtonElement) {
+  [thinBtn, thickBtn].forEach((b) => b.classList.remove("selected"));
+  btn.classList.add("selected");
+}
+
 // Mouse handlers
 canvas.addEventListener("mousedown", (e) => {
   const start = getPos(e);
-  activeStroke = new MarkerStroke(start);
+  activeStroke = new MarkerStroke(start, currentWidth, currentColor);
   commands.push(activeStroke);
   redoCommands = [];
   dispatchChanged();
@@ -133,5 +146,16 @@ redoBtn.onclick = () => {
   dispatchChanged();
 };
 
+thinBtn.onclick = () => {
+  currentWidth = 4;
+  selectTool(thinBtn);
+};
+
+thickBtn.onclick = () => {
+  currentWidth = 10;
+  selectTool(thickBtn);
+};
+
 // Initial draw
+selectTool(thinBtn);
 dispatchChanged();
