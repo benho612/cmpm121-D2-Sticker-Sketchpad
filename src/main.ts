@@ -1,5 +1,11 @@
 import "./style.css";
 
+let currentTool: "marker" | "sticker" = "marker";
+
+//sticker
+const stickers = ["⭐", "🔥", "🎈"];
+let currentSticker = stickers[0];
+
 //Stroke
 let currentWidth = 4;
 let mouseDown = false;
@@ -64,6 +70,36 @@ class MarkerStroke implements DisplayCommand {
   }
 }
 
+class StickerCommand implements DisplayCommand {
+  x: number;
+  y: number;
+  text: string;
+  size: number;
+  angle: number;
+  constructor(x: number, y: number, text: string, size = 32, angle = 0) {
+    this.x = x;
+    this.y = y;
+    this.text = text;
+    this.size = size;
+    this.angle = angle;
+  }
+  drag(p: { x: number; y: number }) {
+    this.x = p.x;
+    this.y = p.y;
+  }
+  display(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+    ctx.font =
+      `${this.size}px system-ui, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(this.text, 0, 0);
+    ctx.restore();
+  }
+}
+
 class MarkerPreview {
   x = 0;
   y = 0;
@@ -82,10 +118,32 @@ class MarkerPreview {
     ctx.restore();
   }
 }
+
+class StickerPreview {
+  x = 0;
+  y = 0;
+  set(p: { x: number; y: number }) {
+    this.x = p.x;
+    this.y = p.y;
+  }
+  display(ctx: CanvasRenderingContext2D, text: string, size = 32) {
+    if (mouseDown) return;
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.font =
+      `${size}px system-ui, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, this.x, this.y);
+    ctx.restore();
+  }
+}
+
 // Drawing state
 let commands: DisplayCommand[] = [];
 let redoCommands: DisplayCommand[] = [];
 let activeStroke: MarkerStroke | null = null;
+let activeSticker: StickerCommand | null = null;
 
 // Buttons
 const clearBtn = document.createElement("button");
@@ -99,6 +157,13 @@ thinBtn.textContent = "Thin";
 const thickBtn = document.createElement("button");
 thickBtn.textContent = "Thick";
 toolbar.append(clearBtn, undoBtn, redoBtn, thinBtn, thickBtn);
+
+const stickerBtns: HTMLButtonElement[] = stickers.map((s) => {
+  const b = document.createElement("button");
+  b.textContent = s;
+  toolbar.append(b);
+  return b;
+});
 
 // Utilities
 function getPos(e: MouseEvent) {
@@ -114,6 +179,11 @@ function redraw() {
   for (const cmd of commands) cmd.display(ctx);
 
   preview.display(ctx, currentWidth);
+  if (currentTool === "marker") {
+    preview.display(ctx, currentWidth);
+  } else {
+    previewSticker.display(ctx, currentSticker, 32);
+  }
 }
 
 function dispatchChanged() {
@@ -127,18 +197,27 @@ function dispatchToolMoved() {
 }
 
 function selectTool(btn: HTMLButtonElement) {
-  [thinBtn, thickBtn].forEach((b) => b.classList.remove("selected"));
+  const allButtons = [thinBtn, thickBtn, ...stickerBtns];
+  allButtons.forEach((b) => b.classList.remove("selected"));
   btn.classList.add("selected");
 }
 
 // Mouse handlers
 const preview = new MarkerPreview();
+const previewSticker = new StickerPreview();
 
 canvas.addEventListener("mousedown", (e) => {
   mouseDown = true;
+
   const start = getPos(e);
-  activeStroke = new MarkerStroke(start, currentWidth, currentColor);
-  commands.push(activeStroke);
+  if (currentTool === "marker") {
+    activeStroke = new MarkerStroke(start, currentWidth, currentColor);
+    commands.push(activeStroke);
+  } else { // sticker
+    activeSticker = new StickerCommand(start.x, start.y, currentSticker, 32);
+    commands.push(activeSticker);
+  }
+
   redoCommands = [];
   dispatchChanged();
 });
@@ -146,11 +225,16 @@ canvas.addEventListener("mousedown", (e) => {
 canvas.addEventListener("mousemove", (e) => {
   const p = getPos(e);
   preview.set(p);
-  dispatchToolMoved();
+  previewSticker.set(p);
 
   if (activeStroke) {
     activeStroke.drag(p);
     dispatchChanged();
+  } else if (activeSticker) {
+    activeSticker.drag(p);
+    dispatchChanged();
+  } else {
+    dispatchToolMoved();
   }
 });
 
@@ -158,6 +242,7 @@ canvas.addEventListener("mousemove", (e) => {
   canvas.addEventListener(ev, () => {
     mouseDown = false;
     activeStroke = null;
+    activeSticker = null;
     dispatchToolMoved();
   })
 );
@@ -184,16 +269,27 @@ redoBtn.onclick = () => {
 };
 
 thinBtn.onclick = () => {
+  currentTool = "marker";
   currentWidth = 4;
   selectTool(thinBtn);
   dispatchToolMoved();
 };
 
 thickBtn.onclick = () => {
+  currentTool = "marker";
   currentWidth = 10;
   selectTool(thickBtn);
   dispatchToolMoved();
 };
+
+stickerBtns.forEach((btn, i) => {
+  btn.onclick = () => {
+    currentTool = "sticker";
+    currentSticker = stickers[i];
+    selectTool(btn);
+    dispatchToolMoved(); // refresh preview
+  };
+});
 
 // Initial draw
 selectTool(thinBtn);
