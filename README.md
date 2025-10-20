@@ -1,3 +1,18 @@
 # CMPM 121 D2 Project
 
-This is the starting point for your CMPM 121 D2 project. Students should make sure to remove _this_ content from their README.md file and replace it with their own project documentation.
+🖌️ Quaint Paint
+
+A playful web app built with TypeScript and the Canvas API that lets users draw, clear, undo, and redo their sketches.
+Developed step-by-step for the CMPM 121 Sticker Sketchpad assignment.
+
+✨ Features
+
+Freehand drawing with mouse
+
+Clear, Undo, and Redo controls
+
+Event-driven updates using a display list
+
+🚀 Tech
+
+TypeScript · HTML Canvas API · CSS
