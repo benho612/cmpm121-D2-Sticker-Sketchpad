@@ -5,6 +5,7 @@ let currentTool: "marker" | "sticker" = "marker";
 //sticker
 const stickers = ["⭐", "🔥", "🎈"];
 let currentSticker = stickers[0];
+let stickerBtns: HTMLButtonElement[] = [];
 
 //Stroke
 let currentWidth = 4;
@@ -95,6 +96,7 @@ class StickerCommand implements DisplayCommand {
       `${this.size}px system-ui, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    ctx.fillStyle = "#111";
     ctx.fillText(this.text, 0, 0);
     ctx.restore();
   }
@@ -156,14 +158,9 @@ const thinBtn = document.createElement("button");
 thinBtn.textContent = "Thin";
 const thickBtn = document.createElement("button");
 thickBtn.textContent = "Thick";
-toolbar.append(clearBtn, undoBtn, redoBtn, thinBtn, thickBtn);
-
-const stickerBtns: HTMLButtonElement[] = stickers.map((s) => {
-  const b = document.createElement("button");
-  b.textContent = s;
-  toolbar.append(b);
-  return b;
-});
+const addStickerBtn = document.createElement("button");
+addStickerBtn.textContent = "Add Sticker";
+toolbar.append(clearBtn, undoBtn, redoBtn, thinBtn, thickBtn, addStickerBtn);
 
 // Utilities
 function getPos(e: MouseEvent) {
@@ -171,14 +168,32 @@ function getPos(e: MouseEvent) {
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
 
+function renderStickerButtons() {
+  // remove old buttons from the DOM
+  for (const b of stickerBtns) b.remove();
+
+  // rebuild from current stickers[]
+  stickerBtns = stickers.map((s, i) => {
+    const b = document.createElement("button");
+    b.textContent = s;
+    b.onclick = () => {
+      currentTool = "sticker";
+      currentSticker = stickers[i];
+      selectTool(b);
+      dispatchToolMoved();
+    };
+    toolbar.append(b);
+    return b;
+  });
+}
+
 // Redraw everything
 function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  for (const cmd of commands) cmd.display(ctx);
 
-  preview.display(ctx, currentWidth);
+  for (const cmd of commands) cmd.display(ctx);
   if (currentTool === "marker") {
     preview.display(ctx, currentWidth);
   } else {
@@ -229,10 +244,12 @@ canvas.addEventListener("mousemove", (e) => {
 
   if (activeStroke) {
     activeStroke.drag(p);
-    dispatchChanged();
+    redraw();
+    undoBtn.disabled = false;
   } else if (activeSticker) {
     activeSticker.drag(p);
-    dispatchChanged();
+    redraw();
+    undoBtn.disabled = false;
   } else {
     dispatchToolMoved();
   }
@@ -282,15 +299,23 @@ thickBtn.onclick = () => {
   dispatchToolMoved();
 };
 
-stickerBtns.forEach((btn, i) => {
-  btn.onclick = () => {
-    currentTool = "sticker";
-    currentSticker = stickers[i];
-    selectTool(btn);
-    dispatchToolMoved(); // refresh preview
-  };
-});
+addStickerBtn.onclick = () => {
+  const text = prompt("Custom sticker text:", "🧽");
+  if (!text) return;
+  const value = text.trim();
+  if (!value) return;
+
+  stickers.push(value); // update data
+  renderStickerButtons(); // rebuild buttons
+
+  const newBtn = stickerBtns[stickerBtns.length - 1];
+  currentTool = "sticker";
+  currentSticker = value;
+  selectTool(newBtn);
+  dispatchToolMoved();
+};
 
 // Initial draw
+renderStickerButtons();
 selectTool(thinBtn);
 dispatchChanged();
