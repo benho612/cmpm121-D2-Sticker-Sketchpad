@@ -8,7 +8,9 @@ let currentSticker = stickers[0];
 let stickerBtns: HTMLButtonElement[] = [];
 
 //Stroke
-let currentWidth = 4;
+let currentWidth = 5;
+const THIN = 5;
+const THICK = 12;
 let mouseDown = false;
 const currentColor = "#111";
 
@@ -17,16 +19,31 @@ const title = document.createElement("h1");
 title.textContent = "Quaint Paint";
 document.body.append(title);
 
-// Toolbar
+// App shell
+const app = document.createElement("div");
+app.className = "app";
+document.body.append(app);
+
+// Top toolbar (non-sticker controls)
 const toolbar = document.createElement("div");
 toolbar.className = "toolbar";
-document.body.append(toolbar);
+app.append(toolbar);
 
-// Canvas
+// Board area: canvas + sticker bar
+const board = document.createElement("div");
+board.className = "board";
+app.append(board);
+
+// Canvas (make it larger)
 const canvas = document.createElement("canvas");
-canvas.width = 256;
-canvas.height = 256;
-document.body.append(canvas);
+canvas.width = 512; // was 256
+canvas.height = 512; // was 256
+board.append(canvas);
+
+// Sticker bar at the bottom of the canvas
+const stickerBar = document.createElement("div");
+stickerBar.className = "sticker-bar";
+board.append(stickerBar);
 
 // Context setup
 const ctx = canvas.getContext("2d")!;
@@ -110,7 +127,6 @@ class MarkerPreview {
     this.y = p.y;
   }
   display(ctx: CanvasRenderingContext2D, radius: number) {
-    // only show when mouse is NOT down
     if (mouseDown) return;
     ctx.save();
     ctx.beginPath();
@@ -162,15 +178,8 @@ const addStickerBtn = document.createElement("button");
 addStickerBtn.textContent = "Add Sticker";
 const exportBtn = document.createElement("button");
 exportBtn.textContent = "Export PNG";
-toolbar.append(
-  clearBtn,
-  undoBtn,
-  redoBtn,
-  thinBtn,
-  thickBtn,
-  addStickerBtn,
-  exportBtn,
-);
+toolbar.append(clearBtn, undoBtn, redoBtn, thinBtn, thickBtn);
+stickerBar.append(addStickerBtn, exportBtn);
 
 // Utilities
 function getPos(e: MouseEvent) {
@@ -179,7 +188,6 @@ function getPos(e: MouseEvent) {
 }
 
 function renderStickerButtons() {
-  // remove old buttons from the DOM
   for (const b of stickerBtns) b.remove();
 
   // rebuild from current stickers[]
@@ -192,7 +200,7 @@ function renderStickerButtons() {
       selectTool(b);
       dispatchToolMoved();
     };
-    toolbar.append(b);
+    stickerBar.append(b);
     return b;
   });
 }
@@ -297,14 +305,14 @@ redoBtn.onclick = () => {
 
 thinBtn.onclick = () => {
   currentTool = "marker";
-  currentWidth = 4;
+  currentWidth = THIN;
   selectTool(thinBtn);
   dispatchToolMoved();
 };
 
 thickBtn.onclick = () => {
   currentTool = "marker";
-  currentWidth = 10;
+  currentWidth = THICK;
   selectTool(thickBtn);
   dispatchToolMoved();
 };
@@ -326,18 +334,18 @@ addStickerBtn.onclick = () => {
 };
 
 exportBtn.onclick = () => {
+  const target = 1024; // desired output size
+  const scale = target / canvas.width; // works for square board
+
   const big = document.createElement("canvas");
-  big.width = 1024;
-  big.height = 1024;
+  big.width = Math.round(canvas.width * scale);
+  big.height = Math.round(canvas.height * scale);
   const bctx = big.getContext("2d")!;
 
-  // White background (so it isn't transparent)
   bctx.fillStyle = "#fff";
   bctx.fillRect(0, 0, big.width, big.height);
-
-  // Scale up and draw all commands (no previews)
   bctx.save();
-  bctx.scale(4, 4);
+  bctx.scale(scale, scale);
   for (const cmd of commands) cmd.display(bctx);
   bctx.restore();
 
