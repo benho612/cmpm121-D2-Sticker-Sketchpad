@@ -1,7 +1,12 @@
 /* Layout */
 .app {
   max-width: 960px;
+  margin: 2rem auto;
   padding: 1rem;
+}
+
+h1 {
+  text-align: center;
 }
 .toolbar {
   display: flex;

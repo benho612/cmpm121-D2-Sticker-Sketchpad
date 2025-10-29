@@ -34,10 +34,10 @@ const board = document.createElement("div");
 board.className = "board";
 app.append(board);
 
-// Canvas (make it larger)
+// Canvas
 const canvas = document.createElement("canvas");
-canvas.width = 512; // was 256
-canvas.height = 512; // was 256
+canvas.width = 512;
+canvas.height = 512;
 board.append(canvas);
 
 // Sticker bar at the bottom of the canvas
@@ -94,7 +94,7 @@ class StickerCommand implements DisplayCommand {
   text: string;
   size: number;
   angle: number;
-  constructor(x: number, y: number, text: string, size = 32, angle = 0) {
+  constructor(x: number, y: number, text: string, size = 36, angle = 0) {
     this.x = x;
     this.y = y;
     this.text = text;
@@ -215,7 +215,7 @@ function redraw() {
   if (currentTool === "marker") {
     preview.display(ctx, currentWidth);
   } else {
-    previewSticker.display(ctx, currentSticker, 32);
+    previewSticker.display(ctx, currentSticker, 36);
   }
 }
 
@@ -335,7 +335,7 @@ addStickerBtn.onclick = () => {
 
 exportBtn.onclick = () => {
   const target = 1024; // desired output size
-  const scale = target / canvas.width; // works for square board
+  const scale = target / canvas.width;
 
   const big = document.createElement("canvas");
   big.width = Math.round(canvas.width * scale);
