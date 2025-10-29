@@ -12,7 +12,8 @@ let currentWidth = 5;
 const THIN = 5;
 const THICK = 12;
 let mouseDown = false;
-const currentColor = "#111";
+let currentColor = "#111";
+let nextAngle = 0; // radians for the NEXT sticker placement
 
 // Title
 const title = document.createElement("h1");
@@ -131,7 +132,7 @@ class MarkerPreview {
     ctx.save();
     ctx.beginPath();
     ctx.arc(this.x, this.y, radius / 2, 0, Math.PI * 2);
-    ctx.strokeStyle = "#555";
+    ctx.strokeStyle = currentColor;
     ctx.stroke();
     ctx.restore();
   }
@@ -148,11 +149,14 @@ class StickerPreview {
     if (mouseDown) return;
     ctx.save();
     ctx.globalAlpha = 0.6;
+    ctx.translate(this.x, this.y);
+    ctx.rotate(nextAngle); // show upcoming rotation
     ctx.font =
       `${size}px system-ui, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, this.x, this.y);
+    ctx.fillStyle = "#111"; // ensure visible on white
+    ctx.fillText(text, 0, 0);
     ctx.restore();
   }
 }
@@ -164,6 +168,8 @@ let activeStroke: MarkerStroke | null = null;
 let activeSticker: StickerCommand | null = null;
 
 // Buttons
+const colorBtn = document.createElement("button");
+colorBtn.textContent = "Random Color";
 const clearBtn = document.createElement("button");
 clearBtn.textContent = "Clear";
 const undoBtn = document.createElement("button");
@@ -178,13 +184,23 @@ const addStickerBtn = document.createElement("button");
 addStickerBtn.textContent = "Add Sticker";
 const exportBtn = document.createElement("button");
 exportBtn.textContent = "Export PNG";
-toolbar.append(clearBtn, undoBtn, redoBtn, thinBtn, thickBtn);
+toolbar.append(clearBtn, undoBtn, redoBtn, thinBtn, thickBtn, colorBtn);
 stickerBar.append(addStickerBtn, exportBtn);
 
 // Utilities
+function randAngle(): number {
+  // random tilt between -30° and +30°
+  return (Math.random() * 60 - 30) * Math.PI / 180;
+}
+
 function getPos(e: MouseEvent) {
   const rect = canvas.getBoundingClientRect();
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function randHue() {
+  const h = Math.floor(Math.random() * 360);
+  return `hsl(${h} 85% 35%)`;
 }
 
 function renderStickerButtons() {
@@ -197,6 +213,7 @@ function renderStickerButtons() {
     b.onclick = () => {
       currentTool = "sticker";
       currentSticker = stickers[i];
+      nextAngle = randAngle();
       selectTool(b);
       dispatchToolMoved();
     };
@@ -247,7 +264,13 @@ canvas.addEventListener("mousedown", (e) => {
     activeStroke = new MarkerStroke(start, currentWidth, currentColor);
     commands.push(activeStroke);
   } else { // sticker
-    activeSticker = new StickerCommand(start.x, start.y, currentSticker, 32);
+    activeSticker = new StickerCommand(
+      start.x,
+      start.y,
+      currentSticker,
+      36,
+      nextAngle,
+    );
     commands.push(activeSticker);
   }
 
@@ -306,6 +329,7 @@ redoBtn.onclick = () => {
 thinBtn.onclick = () => {
   currentTool = "marker";
   currentWidth = THIN;
+  currentColor = randHue();
   selectTool(thinBtn);
   dispatchToolMoved();
 };
@@ -313,6 +337,7 @@ thinBtn.onclick = () => {
 thickBtn.onclick = () => {
   currentTool = "marker";
   currentWidth = THICK;
+  currentColor = randHue();
   selectTool(thickBtn);
   dispatchToolMoved();
 };
@@ -334,7 +359,7 @@ addStickerBtn.onclick = () => {
 };
 
 exportBtn.onclick = () => {
-  const target = 1024; // desired output size
+  const target = 1024;
   const scale = target / canvas.width;
 
   const big = document.createElement("canvas");
@@ -353,6 +378,13 @@ exportBtn.onclick = () => {
   a.href = big.toDataURL("image/png");
   a.download = "quaint-paint.png";
   a.click();
+};
+
+colorBtn.onclick = () => {
+  currentTool = "marker";
+  currentColor = randHue();
+  selectTool(thinBtn);
+  dispatchToolMoved();
 };
 
 // Initial draw
