@@ -160,7 +160,17 @@ const thickBtn = document.createElement("button");
 thickBtn.textContent = "Thick";
 const addStickerBtn = document.createElement("button");
 addStickerBtn.textContent = "Add Sticker";
-toolbar.append(clearBtn, undoBtn, redoBtn, thinBtn, thickBtn, addStickerBtn);
+const exportBtn = document.createElement("button");
+exportBtn.textContent = "Export PNG";
+toolbar.append(
+  clearBtn,
+  undoBtn,
+  redoBtn,
+  thinBtn,
+  thickBtn,
+  addStickerBtn,
+  exportBtn,
+);
 
 // Utilities
 function getPos(e: MouseEvent) {
@@ -313,6 +323,28 @@ addStickerBtn.onclick = () => {
   currentSticker = value;
   selectTool(newBtn);
   dispatchToolMoved();
+};
+
+exportBtn.onclick = () => {
+  const big = document.createElement("canvas");
+  big.width = 1024;
+  big.height = 1024;
+  const bctx = big.getContext("2d")!;
+
+  // White background (so it isn't transparent)
+  bctx.fillStyle = "#fff";
+  bctx.fillRect(0, 0, big.width, big.height);
+
+  // Scale up and draw all commands (no previews)
+  bctx.save();
+  bctx.scale(4, 4);
+  for (const cmd of commands) cmd.display(bctx);
+  bctx.restore();
+
+  const a = document.createElement("a");
+  a.href = big.toDataURL("image/png");
+  a.download = "quaint-paint.png";
+  a.click();
 };
 
 // Initial draw
